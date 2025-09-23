@@ -94,6 +94,9 @@ def filter_files_by_date(zip_files: List[str], year: str, month: str) -> List[st
     Returns:
         过滤后的zip文件列表
     """
+    if not year or not month:
+        return zip_files
+
     # 构建日期模式，如 "2025-04"
     date_pattern = f"{year}-{month.zfill(2)}"
 
@@ -175,14 +178,20 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
-    python download_data.py --year 2025 --month 04
-    python download_data.py --year 2025 --month 04 --download-dir ./test_downloads
+    python download_zip_data.py --year 2025 --month 04
+    python download_zip_data.py --year 2025 --month 04 --download-dir ./test_downloads
+    python download_zip_data.py --download-dir ./all_downloads  # 下载所有数据
+    python download_zip_data.py --workers 8  # 使用8个线程下载所有数据
         """,
     )
 
-    parser.add_argument("-y", "--year", required=True, help="年份 (如: 2025)")
+    parser.add_argument(
+        "-y", "--year", help="年份 (如: 2025) - 可选，不指定则下载所有数据"
+    )
 
-    parser.add_argument("-m", "--month", required=True, help="月份 (如: 04 或 4)")
+    parser.add_argument(
+        "-m", "--month", help="月份 (如: 04 或 4) - 可选，不指定则下载所有数据"
+    )
 
     parser.add_argument(
         "--data-dir",
@@ -215,20 +224,32 @@ def main():
     args = parser.parse_args()
 
     # 验证参数
-    try:
-        year_int = int(args.year)
-        month_int = int(args.month)
-        if not (1 <= month_int <= 12):
-            raise ValueError("月份必须在1-12之间")
-    except ValueError as e:
-        print(f"参数错误: {e}")
-        sys.exit(1)
+    year = None
+    month = None
 
-    # 格式化月份为两位数
-    year = args.year
-    month = f"{month_int:02d}"
+    if args.year or args.month:
+        # 如果提供了年份或月份中的任何一个，则两个都必须提供
+        if not (args.year and args.month):
+            print("错误: 如果指定年份或月份，则必须同时指定两者")
+            sys.exit(1)
 
-    print(f"开始搜索 {year}年{month}月 的数据文件...")
+        try:
+            year_int = int(args.year)
+            month_int = int(args.month)
+            if not (1 <= month_int <= 12):
+                raise ValueError("月份必须在1-12之间")
+
+            year = args.year
+            month = f"{month_int:02d}"
+        except ValueError as e:
+            print(f"参数错误: {e}")
+            sys.exit(1)
+
+    if year and month:
+        print(f"开始搜索 {year}年{month}月 的数据文件...")
+    else:
+        print("开始搜索所有数据文件...")
+
     print(f"数据目录: {args.data_dir}")
     print(f"下载目录: {args.download_dir}")
     print(f"并发线程数: {args.workers}")
@@ -259,13 +280,21 @@ def main():
 
     print(f"总共找到 {len(all_zip_files)} 个zip文件")
 
-    # 根据年份月份过滤
-    filtered_files = filter_files_by_date(all_zip_files, year, month)
-    print(f"符合条件的文件: {len(filtered_files)} 个")
+    # 根据年份月份过滤（如果指定了的话）
+    if year and month:
+        filtered_files = filter_files_by_date(all_zip_files, year, month)
+        print(f"符合 {year}年{month}月 条件的文件: {len(filtered_files)} 个")
 
-    if not filtered_files:
-        print(f"未找到 {year}年{month}月 的数据文件")
-        sys.exit(0)
+        if not filtered_files:
+            print(f"未找到 {year}年{month}月 的数据文件")
+            sys.exit(0)
+    else:
+        filtered_files = all_zip_files
+        print(f"所有zip文件: {len(filtered_files)} 个")
+
+        if not filtered_files:
+            print("未找到任何zip文件")
+            sys.exit(0)
 
     # 显示将要下载的文件
     print("\n将要下载的文件:")
@@ -275,7 +304,12 @@ def main():
         print(f"  ... 还有 {len(filtered_files) - 10} 个文件")
 
     # 确认下载
-    response = input(f"\n确定要下载这 {len(filtered_files)} 个文件吗? (y/N): ")
+    if year and month:
+        action_desc = f"下载这 {len(filtered_files)} 个 {year}年{month}月 的文件"
+    else:
+        action_desc = f"下载所有 {len(filtered_files)} 个文件"
+
+    response = input(f"\n确定要{action_desc}吗? (y/N): ")
     if response.lower() not in ["y", "yes"]:
         print("取消下载")
         sys.exit(0)
