@@ -203,7 +203,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
-    python download_xml_multiprocess.py --max-depth 5
+    python download_xml_multiprocess.py --max-depth 25 --workers 64
     python download_xml_multiprocess.py --workers 8 --max-depth 3 --start-prefix data/futures/cm/daily/
         """,
     )
